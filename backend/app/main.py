@@ -111,12 +111,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Import and include routers (will be added in next steps)
-# from app.routers import devices, jobs, reports, tunnels
-# app.include_router(devices.router, prefix="/api/devices", tags=["devices"])
-# app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
-# app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
-# app.include_router(tunnels.router, prefix="/api/tunnels", tags=["tunnels"])
+# Import and include routers
+from app.routers import devices, jobs
+
+app.include_router(devices.router, prefix="/api/devices", tags=["Devices"])
+app.include_router(jobs.router, prefix="/api/jobs", tags=["Jobs"])
 
 
 if __name__ == "__main__":

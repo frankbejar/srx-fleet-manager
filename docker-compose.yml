@@ -1,0 +1,135 @@
+version: "3.9"
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: srx-fleet-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-srx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-srxpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-srx_fleet}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-srx} -d ${POSTGRES_DB:-srx_fleet}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - srx-network
+
+  # Redis (job queue & cache)
+  redis:
+    image: redis:7-alpine
+    container_name: srx-fleet-redis
+    command: ["redis-server", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - srx-network
+
+  # FastAPI Backend
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: srx-fleet-api
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-srx}:${POSTGRES_PASSWORD:-srxpassword}@db:5432/${POSTGRES_DB:-srx_fleet}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./storage:/app/storage
+    ports:
+      - "127.0.0.1:8000:8000"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    networks:
+      - srx-network
+
+  # Celery Worker (background jobs)
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: srx-fleet-worker
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-srx}:${POSTGRES_PASSWORD:-srxpassword}@db:5432/${POSTGRES_DB:-srx_fleet}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - api
+      - redis
+      - db
+    volumes:
+      - ./backend:/app
+      - ./storage:/app/storage
+    command: ["celery", "-A", "worker.celery_app", "worker", "--loglevel=INFO", "-Q", "default,backup,health,change", "-c", "5"]
+    networks:
+      - srx-network
+
+  # Celery Beat (scheduler)
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: srx-fleet-beat
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-srx}:${POSTGRES_PASSWORD:-srxpassword}@db:5432/${POSTGRES_DB:-srx_fleet}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - worker
+    volumes:
+      - ./backend:/app
+      - ./storage:/app/storage
+    command: ["celery", "-A", "worker.celery_app", "beat", "--loglevel=INFO"]
+    networks:
+      - srx-network
+
+  # Next.js Frontend
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: srx-fleet-ui
+    env_file:
+      - .env
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - api
+    volumes:
+      - ./ui:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "127.0.0.1:3000:3000"
+    command: ["npm", "run", "dev"]
+    networks:
+      - srx-network
+
+networks:
+  srx-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local

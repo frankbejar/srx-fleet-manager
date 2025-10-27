@@ -53,8 +53,16 @@ def health_check_device(self, device_id: int, user_email: str = "system"):
             # Get storage info
             storage = PyEZService.get_system_storage(device)
 
-            # Get tunnel status
-            tunnels = PyEZService.get_ipsec_sa(device)
+            # Get tunnel status (optional - some devices don't support this)
+            tunnels = []
+            try:
+                tunnels = PyEZService.get_ipsec_sa(device)
+            except Exception as e:
+                logger.warning(
+                    "Could not get IPsec SA (device may not support this command)",
+                    hostname=device.hostname,
+                    error=str(e)
+                )
 
             # Update device info
             device.model = facts.get('model')

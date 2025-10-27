@@ -11,7 +11,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-srx_fleet}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "127.0.0.1:5432:5432"
     healthcheck:
@@ -80,7 +79,7 @@ services:
     volumes:
       - ./backend:/app
       - ./storage:/app/storage
-    command: ["celery", "-A", "worker.celery_app", "worker", "--loglevel=INFO", "-Q", "default,backup,health,change", "-c", "5"]
+    command: ["celery", "-A", "worker.celery_app", "worker", "--loglevel=INFO", "-Q", "celery,default,backup,health,change", "-c", "5"]
     networks:
       - srx-network
 

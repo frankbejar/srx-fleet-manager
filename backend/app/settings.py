@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     sp_drive_id: Optional[str] = None
     sp_folder_path: str = "ChangeRequests"
 
+    # Timezone
+    timezone: str = "America/Phoenix"
+
     # Celery
     celery_broker_url: str = "redis://redis:6379/0"
     celery_result_backend: str = "redis://redis:6379/0"
@@ -68,6 +71,7 @@ class Settings(BaseSettings):
     # Scheduled tasks
     backup_schedule_enabled: bool = True
     backup_schedule_cron: str = "0 2 * * *"
+    health_check_schedule_enabled: bool = True  # Separate control for health check scheduling
     health_check_interval: int = 300
 
     # Safety & Guardrails
@@ -87,6 +91,15 @@ class Settings(BaseSettings):
     git_author_email: str = "srx-manager@yourdomain.com"
     git_auto_commit: bool = True
     git_auto_push: bool = False
+
+    # AI / LLM
+    gemini_api_key: Optional[str] = None
+    gemini_model: str = "gemini-1.5-flash"
+    ai_analysis_enabled: bool = False
+
+    # Uptime Robot
+    uptimerobot_api_key: Optional[str] = None
+    uptimerobot_enabled: bool = False
 
     class Config:
         env_file = ".env"

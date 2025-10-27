@@ -9,6 +9,9 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 import structlog
+from datetime import datetime
+from fastapi.encoders import jsonable_encoder
+from typing import Any
 
 from app.settings import get_settings
 from app.database import engine, Base
@@ -49,6 +52,14 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down SRX Fleet Manager API")
 
 
+# Custom JSON encoder for datetime
+def custom_json_encoder(obj: Any) -> str:
+    """Custom JSON encoder that ensures datetime objects are serialized with 'Z' suffix"""
+    if isinstance(obj, datetime):
+        return obj.isoformat() + 'Z' if not obj.isoformat().endswith('Z') else obj.isoformat()
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+
 # Create FastAPI app
 app = FastAPI(
     title=settings.app_name,
@@ -59,10 +70,29 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Override default JSON encoder
+import json
+from fastapi.responses import ORJSONResponse
+
+
+class CustomJSONResponse(JSONResponse):
+    def render(self, content: Any) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":"),
+            default=custom_json_encoder,
+        ).encode("utf-8")
+
+
+app.router.default_response_class = CustomJSONResponse
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js dev server
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Next.js dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

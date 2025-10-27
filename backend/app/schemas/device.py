@@ -49,6 +49,9 @@ class DeviceUpdate(BaseModel):
     it_technician: Optional[str] = None
     enabled: Optional[bool] = None
     notes: Optional[str] = None
+    ssh_user: Optional[str] = None
+    ssh_password: Optional[str] = None
+    ssh_port: Optional[int] = None
 
 
 class DeviceResponse(DeviceBase):
@@ -62,3 +65,6 @@ class DeviceResponse(DeviceBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat() + 'Z' if v else None
+        }

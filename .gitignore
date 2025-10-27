@@ -152,3 +152,4 @@ inventory_private.csv
 # Sensitive output
 passwords.txt
 secrets/
+storage/firmware/
